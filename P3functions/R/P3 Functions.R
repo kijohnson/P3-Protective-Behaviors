@@ -184,21 +184,16 @@ fun6<-function(group, filt, var, name, exception=""){
 
 fun7<-function (filt, var, name)
 {
-  M_ind <<- Merged_survey %>% select(ExternalReference, {
-    {
-      filt
-    }
-  }, surveydate, {
-    {
-      var
-    }
-  }, gender_bl, race_bl, age_cat, partype) %>% rename(filt = 2) %>%
-    rename(var = 4) %>% filter(!is.na(var) %>% group_by(ExternalReference) %>%
-    filter(surveydate == min(surveydate)) %>% mutate(FB_response = case_when(var %in%
-                                                                               c("Definitely true", "Seems like it could be true") ~
-                                                                               2, var %in% c("Not sure if it's true or untrue") ~ 1,
-                                                                             var %in% c("Definitely not true", "Seems like it's not true") ~
-                                                                               0)) %>% mutate(Myth = name) %>% rename(Reaction = var)
+  M_ind <<- Merged_survey %>%
+    select(ExternalReference, {{filt}}, surveydate, {{var}}, gender_bl, race_bl, age_cat, partype) %>%
+    rename(filt = 2) %>%
+    rename(var = 4) %>% filter(!is.na(var) %>% group_by(ExternalReference)) %>%
+    filter(surveydate == min(surveydate)) %>%
+      mutate(FB_response = case_when(var %in% c("Definitely true", "Seems like it could be true") ~2,
+                                       var %in% c("Not sure if it's true or untrue") ~ 1,
+                                     var %in% c("Definitely not true", "Seems like it's not true") ~0)) %>%
+      mutate(Myth = name) %>%
+      rename(Reaction = var)
   M_ind$FB_response <- factor(M_ind$FB_response, levels = c(0:2),
                               labels = c("no", "unsure", "yes"))
   M_ind <<- M_ind
