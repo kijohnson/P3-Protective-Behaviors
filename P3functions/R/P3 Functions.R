@@ -227,13 +227,8 @@ fun8<-function (filt, var, name)
 }
 
 # First believe functions 9 and 10
-fun9<-function (filt)
-{
-  M_react2 <<- FB1 %>% filter(Exposure == "Yes", Myth == {
-    {
-      filt
-    }
-  })
+fun9<-function (filt){
+M_react2 <<- FB1 %>% filter(Exposure == "Yes", Myth == {{filt}})
   dates <- as.character(unique(M_react2$surveydate))
   for (i in dates) {
     M_react3 <- M_react2 %>%
@@ -241,18 +236,14 @@ fun9<-function (filt)
       group_by(Myth, ExternalReference) %>%
       summarise(N = n()) %>%
       mutate(surveydate = i) #M_react3 creates a dataset with c("surveydate",  "Myth", "n" )
-    FB2 <<- rbind(FB2, M_react3)
-    FB3 <<- FB2 %>%
+    FB2 <- rbind(FB2, M_react3)
+    FB3 <- FB2 %>%
       group_by(Myth, surveydate) %>%
       ungroup(ExternalReference) %>%
       summarise(N_denom = n())  #this creates the denominator for each survey date
   }
   M_react4 <<- FB1 %>% #FB1 is the individual level data created from fun 8
-    filter(Exposure == "Yes", Myth == {
-    {
-      filt
-    }
-  })
+    filter(Exposure == "Yes", Myth == {{filt}})
   dates <- as.character(unique(M_react4$surveydate))
   for (i in dates) {
     M_react5 <<- M_react4 %>% #below code classifies baseline response differently for accurate and inaccurate information items
@@ -267,7 +258,7 @@ fun9<-function (filt)
       summarise(N_baseline = n()) %>% mutate(surveydate = i) #creates numerator
     FB4 <<- rbind(FB4, M_react5)
   }
-  FB5 <- left_join(FB3, FB4, by = c("surveydate", "Myth")) %>%
+  FB5 <<- left_join(FB3, FB4, by = c("surveydate", "Myth")) %>%
     mutate(FB = (N_baseline/N_denom) * 100) %>% mutate(FB = if_else(is.na(FB),
                                                                     0, FB))
   first_believe_byweek <<- rbind(FB5, first_believe_byweek)
