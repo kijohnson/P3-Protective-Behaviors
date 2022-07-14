@@ -228,7 +228,7 @@ fun8<-function (filt, var, name)
 
 # First believe functions 9 and 10
 fun9<-function (filt){
-M_react2 <<- FB1 %>% filter(Exposure == "Yes", Myth == {{filt}})
+M_react2 <- FB1 %>% filter(Exposure == "Yes", Myth == {{filt}})
   dates <- as.character(unique(M_react2$surveydate))
   for (i in dates) {
     M_react3 <- M_react2 %>%
@@ -242,7 +242,7 @@ M_react2 <<- FB1 %>% filter(Exposure == "Yes", Myth == {{filt}})
       ungroup(ExternalReference) %>%
       summarise(N_denom = n())  #this creates the denominator for each survey date
   }
-  M_react4 <<- FB1 %>% #FB1 is the individual level data created from fun 8
+  M_react4 <- FB1 %>% #FB1 is the individual level data created from fun 8
     filter(Exposure == "Yes", Myth == {{filt}})
   dates <- as.character(unique(M_react4$surveydate))
   for (i in dates) {
@@ -265,7 +265,7 @@ M_react2 <<- FB1 %>% filter(Exposure == "Yes", Myth == {{filt}})
 }
 
 fun10<-function (name, group){
-  M_react2 <<- FB1 %>%
+  M_react2 <- FB1 %>%
     select(ExternalReference, Exposure, surveydate, Myth, {{group}}, Baseline_response, first_flag)  %>%
     filter(Exposure == "Yes", Myth == {{name}})%>%
     rename(Group = 5) #This creates starting dataset of individual level data from FB1 created with function8
@@ -276,7 +276,7 @@ fun10<-function (name, group){
     M_react3 <- M_react2 %>%
       filter(surveydate <= i) %>%
       group_by(ExternalReference, Myth, Group) %>%
-      summarise(N = n()) %>% #the number of surveys filled out through date
+      summarise(N = n()) %>% #the number of surveys filled out through date for each person
       mutate(surveydate = i)
     FB2 <<- rbind(FB2, M_react3)  #creates dataset with columns (ExternalReference, Myth, Group, N, and surveydate)
 
@@ -288,7 +288,7 @@ fun10<-function (name, group){
 
   #creates numerator dataset
   for (i in dates) {
-    M_react5 <<- M_react2 %>% #M_react2 is individual level
+    M_react5 <- M_react2 %>% #M_react2 is individual level
       mutate(First_Reaction_Believe = case_when(Baseline_response %in% c(1, 2) & Myth %in% Inaccurate ~ 1 ,
                                                 Baseline_response %in% c(0) & Myth %in% Inaccurate ~ 0,
                                                 Baseline_response %in% c(2) & Myth %in% Accurate ~ 1 ,
