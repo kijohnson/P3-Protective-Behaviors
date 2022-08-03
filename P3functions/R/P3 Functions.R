@@ -184,7 +184,7 @@ fun6<-function(group, filt, var, name, exception=""){
 fun7<-function (filt, var, name)
   {
   M_ind <<- Merged_survey %>%
-    select(ExternalReference, {{filt}}, surveydate, {{var}}, gender_bl, race_bl, age_cat, partype) %>%
+    select(ExternalReference, {{filt}}, surveydate, {{var}}, gender_cat, race_cat, age_cat, partype) %>%
     rename(filt = 2) %>%
     rename(var = 4) %>%
     filter(!is.na(var)) %>%
@@ -213,7 +213,7 @@ fun8<-function (filt, var, name)
       {
         var
       }
-    }, gender_bl, race_bl, age_cat, partype) %>%
+    }, gender_cat, race_cat, age_cat, partype) %>%
     rename(filt = 2) %>%
     rename(var = 4) %>%
     filter(!is.na(var)) %>% mutate(first_flag = case_when(filt =="Yes" & surveydate == min(surveydate) ~ 1, filt != "Yes" ~
@@ -303,3 +303,4 @@ fun10<-function (name, group){
   FB5 <<- left_join(FB3, FB6, by = c("surveydate", "Myth", "Group")) %>%
     mutate(FB = (N_baseline/N_denom) * 100) %>% mutate(FB = if_else(is.na(FB), 0, FB))
 }
+
