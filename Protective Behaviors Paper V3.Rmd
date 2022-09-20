@@ -12,18 +12,17 @@ pacman::p_load(readxl, openxlsx, table1, dplyr, ggplot2, Hmisc, vtable, tidyr, g
 # Import combined survey file 
 ```{r}
 Merged_survey <- read.xlsx("SurveyExport_Merged.xlsx")
-#class(Merged_survey$surveydate)
-Merged_survey$surveydate<-as.Date(Merged_survey$surveydate,origin="1899-12-30", format = "%Y-%m-%d")
 
+Merged_survey$surveydate<-as.Date(Merged_survey$surveydate,origin="1899-12-30", format = "%Y-%m-%d")
+colnames(Merged_survey)
 # Filtering for survey dates between 10/17/2021 and  7/1/2022
 Merged_survey <- Merged_survey %>%
-  filter(surveydate < "2022-07-01" & surveydate >= "2021-10-17")
+  filter(surveydate < "2022-07-01" & surveydate >= "2021-10-17") %>%
+  dplyr::select(ExternalReference, surveydate, PreventionFreq, COVIDStatus, CovidGet_1, COVIDSerious_1,gender_bl, age_cat, race_bl)
 
 Baseline<-read_excel("Baseline.xlsx") # for Table 1
 
-M_all<-read_excel("M_all2.xlsx") #for plots, needed to be re-loaded after running the data export file
-
-#limiting Baseline ids to those in merged survey
+# limiting Baseline ids to those in merged survey
 ids<-unique(Merged_survey$ExternalReference)
 
 Baseline<-Baseline %>%
@@ -37,7 +36,7 @@ COVID_MOhosp1<-read_delim("Teletracking.csv")
 COVID_MOcases2<-read_delim("County(through June 22).csv")
 COVID_MOhosp2<-read_delim("Hospital(through June 22).csv")
 
-#limit case counts to St. Louis City and County
+# Limit case counts to St. Louis City and County
 COVID_STcases1<-COVID_MOcases1 %>%
   filter(County_Desc %in% c("SAINT LOUIS", "SAINT LOUIS CITY")) %>%
   group_by(week_begining) %>%
@@ -49,9 +48,10 @@ COVID_STcases2<-COVID_MOcases2 %>%
   group_by(week_begining) %>%
   summarise(sum=sum(pcr_cases))
 
+# Bind case counts together
 COVID_STcases<-rbind(COVID_STcases1, COVID_STcases2)
 
-#limit hospitalizations to St. Louis Region
+# Limit hospitalizations to St. Louis Region
 COVID_SThosp1<-COVID_MOhosp1%>%
   filter(region=="Saint Louis Region") %>%
   rename(week_begining=dt)
@@ -61,10 +61,11 @@ COVID_SThosp2<-COVID_MOhosp2%>%
   filter(dt %in% c("5/29/2022", "6/5/2022", "6/12/2022", "6/19/2022", "6/26/2022")) %>%
   rename(week_begining=dt) 
 
+# Bind hospitalization counts together
 COVID_SThosp<-rbind(COVID_SThosp1, COVID_SThosp2)
 ```
 
-#participants by week
+# Get participants by week
 ```{r}
 partbywk<-Merged_survey %>%
   group_by(surveydate) %>%
@@ -73,6 +74,7 @@ partbywk<-Merged_survey %>%
 
 # Table 1：Descriptive analysis of demographics
 ```{r}
+# Some data management
 Baseline$age_cat<-factor(Baseline$age_cat, levels = c("18-29", "30-39", "40-49", "50-59", ">60"))
 Baseline$gender_bl<-factor(Baseline$gender_bl, levels = c("Male", "Female", "Non-binary / third gender", "Prefer not to say"))
 Baseline$hispanic_bl<-factor(Baseline$hispanic_bl, levels = c("Yes", "No", "Prefer not to say"))
@@ -88,8 +90,7 @@ Baseline$race_bl<-factor(Baseline$race_bl, levels = c("White", "Black or African
 Baseline$under12_bl<-factor(Baseline$under12_bl, levels = c("Yes", "No"))
 Baseline$vax_received_bl<-factor(Baseline$vax_received_bl, levels = c("Yes, both doses of a 2-dose vaccine", "Yes, first dose of a 2-dose vaccine", "Yes, a 1-dose vaccine", "No, but I plan to get a COVID-19 vaccine", "No, and I don't plan to get a COVID-19 vaccine", "Prefer not to answer"))
 
-#apply labels for table 1
-#label(Baseline$age)<-"Age (years)"
+# apply labels for table 1
 label(Baseline$gender_bl)<-"Gender"
 label(Baseline$race_bl)<-"Race"
 label(Baseline$hispanic_bl)<-"Hispanic Ethnicity"
@@ -98,11 +99,16 @@ label(Baseline$vax_received_bl)<-"Vaccination Status"
 label(Baseline$age_cat)<-"Age Category (years)"
 
 table1(~gender_bl  + race_bl + hispanic_bl + age_cat + vax_received_bl, Baseline)
+
+# calculate mean baseline worry for Blacks and Whites
+mw<-Baseline %>%
+  group_by(race_bl) %>%
+  dplyr::summarize(mean=mean(worry_bl_1, na.rm=TRUE), sd=sd(worry_bl_1, na.rm=TRUE))
 ```
 
 # Line plots for protection behaviors
 ```{r}
-#get percentages of protection behaviors
+# get percentages of protection behaviors
 PF<-Merged_survey %>%
   group_by(surveydate, PreventionFreq) %>%
   filter(!is.na(PreventionFreq)) %>%
@@ -127,17 +133,18 @@ PF2<-PF %>%
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 PF2
 ```
-# Data management for plotting
+
+# Data management for plotting covid status
 ```{r}
 CovidStat<-Merged_survey %>%
   mutate(CS_infection=if_else(grepl('household_closecontact',COVIDStatus)|
+                              grepl('household_test', COVIDStatus)|
+                              grepl('household_closecontact',COVIDStatus)|
                               grepl('household_test',COVIDStatus)|
-                              grepl('household_closecontact',COVIDstatus)|
-                              grepl('household_test',COVIDstatus)|
                               grepl('household_sick', COVIDStatus)|
                               grepl('household_hospital', COVIDStatus)|
-                              grepl('household_sick', COVIDstatus)|grepl('household_hospital',COVIDstatus), 1, 0)) %>%
-  mutate(CS_none=if_else(grepl('household_none', COVIDStatus)|grepl('household_none', COVIDstatus), 1, 0))
+                              grepl('household_sick', COVIDStatus)|grepl('household_hospital',COVIDStatus), 1, 0)) %>%
+  mutate(CS_none=if_else(grepl('household_none', COVIDStatus)|grepl('household_none', COVIDStatus), 1, 0))
 
 CovidStat$CS_infection <- factor(CovidStat$CS_infection, levels=c(1:0), labels=c("Self or close contact COVID infected", "No one COVID infected"))
 CovidStat$CS_none <- factor(CovidStat$CS_none, levels=c(1:0), labels=c("None", "Not none"))
@@ -170,9 +177,10 @@ CovidStat3<-CovidStat2 %>%
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 CovidStat3
 ```
+
 # No one in household sick or hospitalized in last week
 ```{r}
-#CS_none
+# CS_none
 CovidStat6<-CovidStat %>%
   group_by(surveydate, CS_none) %>%
   summarise(Percentage=n()) %>% 
@@ -205,9 +213,8 @@ PF_limited<-PF %>%
 PF_limited<-as.data.frame(PF_limited)
 ```
 
-# Limit dataframe to infection
+# Create dataframe limiting to infection
 ```{r}
-#CovidStat3
 CovidStat3
 
 CovidStat3_limited<-CovidStat2 %>%
@@ -277,84 +284,83 @@ data<-data %>%
 }
 PF_limited<-fixdates(PF_limited)
 
-
 CovidStat<-fixdates(CovidStat)
 CovidStat3_limited<-fixdates(CovidStat3_limited)
 
-#merge PF_limited with COVID_STcases to get St. Louis City and County cases in one dataset for graphing (through June 2022)
-
+# merge PF_limited with COVID_STcases to get St. Louis City and County cases in one dataset for graphing (through June 2022)
 PF_limited<-left_join(PF_limited, COVID_STcases, by="week_begining")
 
-#merge CovidStat with COVID_STcases that goes through June 2022
+# merge CovidStat with COVID_STcases that goes through June 2022
 CovidStat<-left_join(CovidStat, COVID_STcases, by="week_begining")
 
-#merge CovidStat3_limited (close contact infection) with COVID_STcases that goes through June 2022
+# merge CovidStat3_limited (close contact infection) with COVID_STcases that goes through June 2022
 CovidStat3_limited<-left_join(CovidStat3_limited, COVID_STcases,  by="week_begining")
 ```
 
-#Prepare hospitalization dataset to add
+#Prepare hospitalization dataset to add to 
 ```{r}
-class(COVID_SThosp$week_begining)
+# format date
 COVID_SThosp$week_begining<-as.Date(COVID_SThosp$week_begining, "%m/%d/%Y")
 
 hosp<-COVID_SThosp %>%
   filter(week_begining>"2021-08-22") %>%
   dplyr::select(week_begining, total_covid_hospitalized)
 
-
-#merge Merged_survey with hospitalizations that goes through 6/2022
+# merge Merged_survey with hospitalizations that goes through 6/2022
 CovidStat$week_begining<-as.Date(CovidStat$week_begining, "%m/%d/%Y")
 
 CovidStat<-left_join(CovidStat, hosp, by="week_begining")
 
-#select variables
+# select variables
 colnames(CovidStat)
 
+# create analytic dataset
 MSV4models<-CovidStat %>%
-  dplyr::select(ExternalReference, PreventionFreq, CS_infection, CS_none, surveydate, sum, total_covid_hospitalized, gender_bl, age_cat, week_begining, race_bl)
+  dplyr::select(ExternalReference, PreventionFreq, CS_infection, CS_none, surveydate, sum, total_covid_hospitalized, gender_bl, age_cat, week_begining, race_bl, CovidGet_1)
 
+# this data is for other analyses below
 Baseline2<-Baseline %>%
-  dplyr::select(ExternalReference, think_bl_1, worry_bl_1)
+  dplyr::select(ExternalReference, think_bl_1, worry_bl_1) # think and worry are baseline variables
 
-MSV4models<-left_join(Baseline2, MSV4models, by="ExternalReference")
+MSV4models<-left_join(Baseline2, MSV4models, by="ExternalReference") # join with Baseline variables to bring in think and worry
 ```
 
 
 #Graphs for More Protective Behaviors in association with case counts, positive household contacts
 ```{r}
-#Graph of COIVD_STL data with More Preventative Behaviors (updated with case counts May 2022 file=CovidStat4_limited)
+# Graph of COIVD_STL data with More Preventative Behaviors (updated with case counts May 2022 file=CovidStat4_limited)
 
 # delete dates without case counts and create datasets to merge into one big dataset
 PF_limited1<-PF_limited %>%
   filter(!is.na(sum)) %>%
-  rename(STL_Cases=sum, Variable=PreventionFreq) 
+  rename(STL_Cases=sum, Variable=PreventionFreq) # more protective behaviors than last week
 
 CovidStat3_limited1<-CovidStat3_limited %>%
   filter(!is.na(sum)) %>%
-  rename(STL_Cases=sum, Variable=CS_infection) 
+  rename(STL_Cases=sum, Variable=CS_infection)  # infection last week
 
-
-#cbind together
+# cbind together
 
 Data4Plot<-rbind(PF_limited1, CovidStat3_limited1)
 
-#covert to date formats
+# covert to date formats
 Data4Plot$week_begining<-as.Date(Data4Plot$week_begining, "%m/%d/%Y")
 
-#merge with hospitalizations
+# merge with hospitalizations
 Data4Plot<-left_join(Data4Plot, hosp, by="week_begining")
 
-#drop dates 10/17/2022 or earlier
+# drop dates 10/17/2022 or earlier due to small numbers
 Data4Plot<-Data4Plot %>%
   filter(surveydate>="2021-10-17")
 ```
 
 
-
+# Figure 1
 ```{r}
 p1<-Data4Plot %>%
   group_by(surveydate) %>%
   filter(Variable %in% c("More Prevention Behaviors", "Self or close contact COVID infected")) %>%
+  
 ggplot() + 
   geom_point(aes(surveydate, Percentage, color=Variable)) +
   geom_line(aes(surveydate, Percentage, color=Variable)) +
@@ -384,27 +390,12 @@ p1  + plot_layout(ncol=1, nrow=1, guides='keep') &
 dev.off()
 ```
 
-#Dataset for logistic analyses
+# Dataset for logistic analyses that asks whether individuals reports more protective behaviors than the week before in when case counts are high or when they are sick or a close contact is sick
 ```{r}
-# creating the MoreProtect, CloseContact, SickHosp, LessPrevent variable
+# creating the MoreProtect and CloseContact variables
 MSV4models <- MSV4models %>%
   mutate(MoreProtect = if_else(PreventionFreq == 'More than you did one week ago?', 1 , 0)) %>%
   mutate(CloseContact= if_else(CS_infection=="Self or close contact COVID infected", 1, 0)) 
-
-MSV4models$week_begining<-as.character(MSV4models$week_begining)
-class(MSV4models$week_begining)
-MSV4models$gt50.2<-ifelse(MSV4models$week_begining %in% c( "2021-10-17", "2021-10-24", "2021-10-31", "2021-11-07", "2021-11-14", "2021-11-21", "2021-11-28","2021-12-05", "2021-12-12", "2022-01-09", "2022-03-13", "2022-03-20","2022-03-27", "2022-04-03", "2022-04-10", "2022-04-24", "2022-05-01", "2022-05-08", "2022-05-15",  "2022-05-22", "2022-05-29", "2022-06-05","2022-06-12","2022-06-19","2022-06-26"), 0,  
-                          ifelse(MSV4models$week_begining %in% c("2021-12-19","2021-12-26", "2022-01-02",  "2022-04-10"), 1, 2))
-table(MSV4models$week_begining, useNA="always")
-table(MSV4models$gt50.2, useNA="always")
-
-MSV4models$gt50.2<-factor(MSV4models$gt50.2, levels=c(0:2), labels=c("Cases within 50% of 2 weeks before", "Cases >= 50% of 2 weeks before", "Cases <= 50% of 2 weeks before"))
-table(MSV4models$gt50.2 , useNA="always")
-
-#omit rows where case counts is missing 
-MSV4models<-MSV4models %>%
-  filter(!is.na(sum))
-MSV4models <-MSV4models[order(MSV4models$ExternalReference),]
 
 #get quantiles based on survey days, need to limit dataset to unique dates
 dates<-MSV4models %>%
@@ -415,7 +406,7 @@ dates<-unique(dates)
 quantile(dates$sum) 
 quantile(dates$total_covid_hospitalized) 
 
-MSV4models <- MSV4models%>% #make rough quartiles for case counts
+MSV4models <- MSV4models%>% # make quartile categories for case counts
   mutate(CC_cat = if_else(sum< 1051, 0 ,
                           if_else(sum >=1051 & sum<2147, 1,
                                  if_else(sum >=2147 & sum<3306, 2,
@@ -423,7 +414,7 @@ MSV4models <- MSV4models%>% #make rough quartiles for case counts
 MSV4models$CC_cat<-as.factor(MSV4models$CC_cat)
 table(MSV4models$CC_cat)
 
-MSV4models <- MSV4models%>% #make rough quartiles for hospitalized counts
+MSV4models <- MSV4models%>% # make quartile categories for hospitalized counts
   mutate(TCV_cat = if_else(total_covid_hospitalized< 276.5, 0 , 
                            if_else(total_covid_hospitalized >=276.5 & total_covid_hospitalized< 479, 1,
                                         if_else(total_covid_hospitalized >=479 & total_covid_hospitalized<794, 2,
@@ -431,7 +422,7 @@ MSV4models <- MSV4models%>% #make rough quartiles for hospitalized counts
 MSV4models$TCV_cat<-as.factor(MSV4models$TCV_cat)
 table(MSV4models$TCV_cat)
 
-
+# plot MoreProtect by survey data according to CC_cat
 p<-ggplot(MSV4models) +
   geom_point(aes(surveydate, MoreProtect,  color=CC_cat)) +
   facet_wrap(~ExternalReference)
@@ -444,44 +435,35 @@ unique<-MSV4models %>%
 
 summary(unique$worry_bl_1)
 summary(unique$think_bl_1)
+summary(as.numeric(MSV4models$CovidGet_1))
+
+# convert CovidGet_1 to numeric
+MSV4models$CovidGet_1<-as.numeric(MSV4models$CovidGet_1)
 
 MSV4models<-MSV4models %>%
-  mutate(worry_AMED=case_when(worry_bl_1>=45~1,
+  mutate(worry_cat_bl=case_when(worry_bl_1>=45~1,
                               worry_bl_1<45~0),
-         think_AMED=case_when(think_bl_1>=60 ~1,
-                              think_bl_1<60 ~0))
+         think_cat_bl=case_when(think_bl_1>=60 ~1,
+                              think_bl_1<60 ~0)) %>%
+  group_by(surveydate) %>%
+  mutate(worry_cat_weekly=case_when(CovidGet_1 >=median(CovidGet_1)~1,
+                                    CovidGet_1 < median(CovidGet_1)~0))
 
 
-MSV4models$worry_AMED<-factor(MSV4models$worry_AMED, levels=c(0,1), labels=c("Worry < median", "Worry >= median"))
-MSV4models$think_AMED<-factor(MSV4models$think_AMED, levels=c(0,1), labels=c("Think < median", "Think >= median"))     
-table(MSV4models$worry_AMED)
-table(MSV4models$think_AMED)
+# factor worry and think
+MSV4models$worry_cat_bl<-factor(MSV4models$worry_cat_bl, levels=c(0,1), labels=c("Worry < median", "Worry >= median"))
+MSV4models$think_cat_bl<-factor(MSV4models$think_cat_bl, levels=c(0,1), labels=c("Think < median", "Think >= median")) 
+MSV4models$worry_cat_weekly<-factor(MSV4models$worry_cat_weekly, levels=c(0,1), labels=c("Worry < median", "Worry >= median"))  
+table(MSV4models$worry_cat_bl)
+table(MSV4models$think_cat_bl)
+table(MSV4models$worry_cat_weekly)
 
 ```
 
 
-# Mixed logistic models
+# Table 2: Mixed logistic models
 ```{r}
-# using sum
-MSV4models$sump1000<-MSV4models$sum/1000
-
-# continuous per 1000 case increase
-glmer_glm<- glmer(data= MSV4models, MoreProtect ~ sump1000 +(1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glm)
-
-cc<-confint.merMod(glmer_glm, method="Wald")
-cc<-as.data.frame(cc[-c(1),])
-ctab <- exp(cbind(est=fixef(glmer_glm),cc))
-
-# >=50% increase in cases from two weeks before
-glmer_glmgt50.2<- glmer(data= MSV4models, MoreProtect ~ gt50.2 +(1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmgt50.2)
-
-cc1<-confint.merMod(glmer_glmgt50.2, method="Wald")
-cc1<-as.data.frame(cc1[-c(1),])
-ctab1 <- exp(cbind(est=fixef(glmer_glmgt50.2),cc1))
-
-#case count category
+# Is case count category associated with more protective behavior than the week before?
 glmer_glmCC<- glmer(data= MSV4models, MoreProtect ~ CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC)
 
@@ -489,7 +471,7 @@ cc2<-confint.merMod(glmer_glmCC, method="Wald")
 cc2<-as.data.frame(cc2[-c(1),])
 ctab2 <- exp(cbind(est=fixef(glmer_glmCC),cc2))
 
-#Close Contact
+# Is having a close contact or self infected associated with more protective behavior than the week before?
 glmer_glm3a<- glmer(data= MSV4models, MoreProtect ~   CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glm3a)
 
@@ -497,84 +479,71 @@ cc3a<-confint.merMod(glmer_glm3a, method="Wald")
 cc3a<-as.data.frame(cc3a[-c(1),])
 ctab3a<- exp(cbind(est=fixef(glmer_glm3a),cc3a))
 
-#gt50.2 adjusted for Close Contact 
-glmer_glm4<- glmer(data= MSV4models, MoreProtect ~  gt50.2 + CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glm4)
-
-cc4<-confint.merMod(glmer_glm4, method="Wald")
-cc4<-as.data.frame(cc4[-c(1),])
-ctab4<- exp(cbind(est=fixef(glmer_glm4),cc4))
-
-#case count adjusted for Close Contact 
+# Case count adjusted for CloseContact 
 glmer_glm5<- glmer(data= MSV4models, MoreProtect ~  CC_cat + CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glm5)
 
 cc5<-confint.merMod(glmer_glm5, method="Wald")
 cc5<-as.data.frame(cc5[-c(1),])
 ctab5<- exp(cbind(est=fixef(glmer_glm5),cc5))
+
+# Weekly worry about Covid19 (ran because curious about this association)
+glmer_glm6<- glmer(data= MSV4models, MoreProtect ~  worry_cat_weekly + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(glmer_glm6)
+
+cc6<-confint.merMod(glmer_glm6, method="Wald")
+cc6<-as.data.frame(cc6[-c(1),])
+ctab6<- exp(cbind(est=fixef(glmer_glm6),cc6))
 ```
 
-# Interactions
-# gender
+# Effect modification (analyses only limited to males and females)
 ```{r}
-table(MSV4models$gender_bl)
-
+# limit to males and females
 MSV4models_gen<-MSV4models %>%
   filter(gender_bl %in% c("Female", "Male"))
 
-#run gender model
-glmer_glmCC_genb<- glmer(data= MSV4models_gen, MoreProtect ~ CC_cat + gender_bl + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# run gender model without interaction term
+glmer_glmCC_genb<- glmer(data= MSV4models_gen, MoreProtect ~ CC_cat + CloseContact + gender_bl + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_genb)
 
-#case count category
-glmer_glmCC_gen<- glmer(data= MSV4models_gen, MoreProtect ~ CC_cat + gender_bl + gender_bl*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# run gender model with interaction term
+glmer_glmCC_gen<- glmer(data= MSV4models_gen, MoreProtect ~ CC_cat + CloseContact +  gender_bl + gender_bl*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_gen)
 
-
+# get significance of interaction term
 lrtest(glmer_glmCC_gen, glmer_glmCC_genb)
+
+# Gender is not significant
 ```
 
-# race
+# Effect modification (analyses only limited to whites and Black or African American)
 ```{r}
-table(MSV4models$race_bl)
-
 MSV4models_race<-MSV4models %>%
-  filter(race_bl %in% c("White", "Black or African American"))
+  filter(race_bl %in% c("White", "Black or African American")) %>%
+  mutate(race_bl2=case_when(race_bl==c("White") ~0,
+                            race_bl==c("Black or African American")~1)) # reverse reference
 
-#case count category
-glmer_glmCC_race<- glmer(data= MSV4models_race, MoreProtect ~ CC_cat + race_bl +race_bl*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_race)
-
-cc6a<-confint.merMod(glmer_glmCC_race, method="Wald")
-cc6a<-as.data.frame(cc6a[-c(1),])
-ctab6a<- exp(cbind(est=fixef(glmer_glmCC_race),cc6a))
-
-#run race model
-glmer_glmCC_raceb<- glmer(data= MSV4models_race, MoreProtect ~ CC_cat+ race_bl + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# run model without interaction term
+glmer_glmCC_raceb<- glmer(data= MSV4models_race, MoreProtect ~ CC_cat+ race_bl +CloseContact +  (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_raceb)
 
+# run model with interaction term
+glmer_glmCC_race<- glmer(data= MSV4models_race, MoreProtect ~ CC_cat + race_bl + CloseContact + race_bl*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(glmer_glmCC_race)
+
+# get significance of interaction term
 lrtest(glmer_glmCC_race, glmer_glmCC_raceb)
 
-#reverse reference for race interaction model to get estimates for whites in lieu of estimating contrasts
-MSV4models_race_rW<-MSV4models_race %>%
-  mutate(race_bl2=case_when(race_bl==c("White") ~0,
-                            race_bl==c("Black or African American")~1))
-table(MSV4models_race_rW$race_bl2)
-MSV4models_race_rW$race_bl2<-factor(MSV4models_race_rW$race_bl2, levels=c(0,1), labels=c("White", "Black or African American"))
+# Interaction is significant
+```
 
-#case count category
-glmer_glmCC_race_rW<- glmer(data= MSV4models_race_rW, MoreProtect ~ CC_cat + race_bl2 +race_bl2*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_race_rW)
-
-cc6b<-confint.merMod(glmer_glmCC_race_rW, method="Wald")
-cc6b<-as.data.frame(cc6b[-c(1),])
-ctab6b<- exp(cbind(est=fixef(glmer_glmCC_race_rW),cc6b))
-
-#Stratify by race
+# Table 2: Stratified estimates by race
+```{r}
+# Whites
 MSV4models_white<-MSV4models %>%
   filter(race_bl %in% c("White"))
 
-glmer_glmCC_white<- glmer(data= MSV4models_white, MoreProtect ~ CC_cat  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+glmer_glmCC_white<- glmer(data= MSV4models_white, MoreProtect ~ CC_cat + CloseContact  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_white)
 
 cc6<-confint.merMod(glmer_glmCC_white, method="Wald")
@@ -583,7 +552,8 @@ ctab6<- exp(cbind(est=fixef(glmer_glmCC_white),cc6))
 
 MSV4models_black<-MSV4models %>%
   filter(race_bl %in% c("Black or African American"))
-glmer_glmCC_black<- glmer(data= MSV4models_black, MoreProtect ~ CC_cat  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+glmer_glmCC_black<- glmer(data= MSV4models_black, MoreProtect ~ CC_cat  + CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_black)
 
 cc7<-confint.merMod(glmer_glmCC_black, method="Wald")
@@ -591,172 +561,105 @@ cc7<-as.data.frame(cc7[-c(1),])
 ctab7<- exp(cbind(est=fixef(glmer_glmCC_black),cc7))
 ```
 
-#age
+# Effect modification (age)
 ```{r}
-table(MSV4models$age_cat)
-
-#collapse age categories
+# collapse age categories
 MSV4models_age <- MSV4models %>%
   mutate(age_cat2=case_when(age_cat %in% c("18-29", "30-39")~0,
          age_cat %in% c("40-49", "50-59") ~1,
          age_cat %in% c(">60") ~2))
 
-#case count category
-glmer_glmCC_age<- glmer(data= MSV4models_age, MoreProtect ~ CC_cat + age_cat2 + age_cat2*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# case count category
+glmer_glmCC_age<- glmer(data= MSV4models_age, MoreProtect ~ CC_cat + age_cat2 + CloseContact + age_cat2*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_age)
 
-#run age model
-glmer_glmCC_ageb<- glmer(data= MSV4models_age, MoreProtect ~ CC_cat + age_cat2 + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# run age model
+glmer_glmCC_ageb<- glmer(data= MSV4models_age, MoreProtect ~ CC_cat + age_cat2 + CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_ageb)
 
+# get significance of interaction term
 lrtest(glmer_glmCC_age, glmer_glmCC_ageb)
 ```
 
-# close contact interactions
+# Close contact interactions
 ```{r}
-#gender
-glmer_glmCC_gen1<- glmer(data= MSV4models_gen, MoreProtect ~CloseContact + gender_bl  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# gender
+glmer_glmCC_gen1<- glmer(data= MSV4models_gen, MoreProtect ~ CC_cat + CloseContact + gender_bl  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_gen1)
 
-glmer_glmCC_gen<- glmer(data= MSV4models_gen, MoreProtect ~CloseContact + gender_bl +gender_bl*CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+glmer_glmCC_gen<- glmer(data= MSV4models_gen, MoreProtect ~ CC_cat + CloseContact + gender_bl +gender_bl*CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_gen)
 
 lrtest(glmer_glmCC_gen1, glmer_glmCC_gen)
 
-#age
-glmer_glmCC_age1<- glmer(data= MSV4models_age, MoreProtect ~CloseContact + age_cat2  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# age
+glmer_glmCC_age1<- glmer(data= MSV4models_age, MoreProtect ~ CC_cat + CloseContact + age_cat2  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_age1)
 
-glmer_glmCC_age<- glmer(data= MSV4models_age, MoreProtect ~CloseContact + age_cat2 + age_cat2*CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+glmer_glmCC_age<- glmer(data= MSV4models_age, MoreProtect ~ CC_cat +CloseContact + age_cat2 + age_cat2*CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_age)
 
 lrtest(glmer_glmCC_age1, glmer_glmCC_age)
 
-#race with black as ref
-
-glmer_glmCC_race1<- glmer(data= MSV4models_race, MoreProtect ~ CloseContact  + race_bl + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# race 
+glmer_glmCC_race1<- glmer(data= MSV4models_race, MoreProtect ~ CC_cat + CloseContact + race_bl2  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_race1)
 
-glmer_glmCC_race<- glmer(data= MSV4models_race, MoreProtect ~ CloseContact  + race_bl +race_bl*CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_race)
+glmer_glmCC_race2<- glmer(data= MSV4models_race, MoreProtect ~  CC_cat + CloseContact + race_bl2 +race_bl2*CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(glmer_glmCC_race2)
 
-lrtest(glmer_glmCC_race1, glmer_glmCC_race)
+# get significance of interaction term
 
-cc7a<-confint.merMod(glmer_glmCC_race, method="Wald")
-cc7a<-as.data.frame(cc7a[-c(1),])
-ctab7a<- exp(cbind(est=fixef(glmer_glmCC_race),cc7a))
+lrtest(glmer_glmCC_race1, glmer_glmCC_race2)
 
-#race with white as ref
-glmer_glmCC_race_rW<- glmer(data= MSV4models_race_rW, MoreProtect ~ CloseContact + race_bl2 +race_bl2*CloseContact + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_race_rW)
-
-cc7b<-confint.merMod(glmer_glmCC_race_rW, method="Wald")
-cc7b<-as.data.frame(cc7b[-c(1),])
-ctab7b<- exp(cbind(est=fixef(glmer_glmCC_race_rW),cc7b))
-
-
-#Stratify by race
-MSV4models_white<-MSV4models %>%
-  filter(race_bl %in% c("White"))
-
-glmer_glmCC_white<- glmer(data= MSV4models_white, MoreProtect ~ CloseContact  + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_white)
-
-cc8<-confint.merMod(glmer_glmCC_white, method="Wald")
-cc8<-as.data.frame(cc8[-c(1),])
-ctab8<- exp(cbind(est=fixef(glmer_glmCC_white),cc8))
-
-MSV4models_black<-MSV4models %>%
-  filter(race_bl =="Black or African American")
-glmer_glmCC_black<- glmer(data= MSV4models_black, MoreProtect ~ CloseContact  + (1|ExternalReference), family = binomial,
-                          control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e9)))
-summary(glmer_glmCC_black)
-
-cc9<-confint.merMod(glmer_glmCC_black, method="Wald")
-cc9<-as.data.frame(cc9[-c(1),])
-ctab9<- exp(cbind(est=fixef(glmer_glmCC_black),cc9))
-
-black<-as.data.frame(table(MSV4models_black$MoreProtect, MSV4models_black$CloseContact, MSV4models_black$surveydate))
-
-white<-as.data.frame(table(MSV4models_white$MoreProtect, MSV4models_white$CloseContact, MSV4models_white$surveydate))
 ```
-#  interations with worry
-```{r}
-#case count category
-glmer_glmCC_worry<- glmer(data= MSV4models, MoreProtect ~ CC_cat + worry_AMED + worry_AMED*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_worry)
 
+# Interactions with weekly worry 
+```{r}
 #run worry model
-glmer_glmCC_worryb<- glmer(data= MSV4models, MoreProtect ~ CC_cat + worry_AMED + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+glmer_glmCC_worryb<- glmer(data= MSV4models, MoreProtect ~ CC_cat + worry_cat_weekly + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 summary(glmer_glmCC_worryb)
+
+#case count category
+glmer_glmCC_worry<- glmer(data= MSV4models, MoreProtect ~ CC_cat + worry_cat_weekly + worry_cat_weekly*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(glmer_glmCC_worry)
 
 lrtest(glmer_glmCC_worry, glmer_glmCC_worryb)
 
-cc10<-confint.merMod(glmer_glmCC_worry, method="Wald")
-cc10<-as.data.frame(cc10[-c(1),])
-ctab10<- exp(cbind(est=fixef(glmer_glmCC_worry),cc10))
+# no significant effect modification
 
-#switch reference
-MSV4models<-MSV4models %>%
-  mutate(worry_AMED_2=case_when(worry_AMED=="Worry >= median" ~0,
-                                worry_AMED=="Worry < median" ~1))
-
-MSV4models$worry_AMED_2<-factor(MSV4models$worry_AMED_2, levels=c(0,1), labels=c("Worry >= median", "Worry < median"))
-table(MSV4models$worry_AMED_2)
-
-glmer_glmCC_worry2<- glmer(data= MSV4models, MoreProtect ~ CC_cat + worry_AMED_2 + worry_AMED_2*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_worry2)
-
-
-cc11<-confint.merMod(glmer_glmCC_worry2, method="Wald")
-cc11<-as.data.frame(cc11[-c(1),])
-ctab11<- exp(cbind(est=fixef(glmer_glmCC_worry2),cc11))
-
+# Difference by baseline in worry between blacks and whites
 worry<-Baseline%>%
   filter(race_bl=="White")
 
-summary(worry$worry_bl_1) #white mean =47.06, median=45
-summary(worry$think_bl_1) #white mean 53.07, median=50
+summary(worry$worry_bl_1) # white mean =47.06, median=45
 
 worry2<-Baseline%>%
   filter(race_bl=="Black or African American")
 
-summary(worry2$worry_bl_1) #black mean =52.6, median =50.5
-summary(worry2$think_bl_1) #black mean=63.63, median=67
+summary(worry2$worry_bl_1) # black mean =52.6, median =50.5
+
+# average worry in blacks and whites by week
+AvWorryWhites <-MSV4models %>%
+  group_by(surveydate, race_bl) %>%
+  summarise(mean=mean(CovidGet_1,na.rm=TRUE)) %>%
+  group_by(race_bl) %>%
+  summarise(grandmean=mean(mean), sd=sd(mean)) 
+
+# plot distribution of worry score for each race by week
+p<-MSV4models %>%
+  filter(race_bl %in% c("White", "Black or African American")) %>%
+  group_by(surveydate, race_bl) %>%
+  summarise(mean=mean(CovidGet_1,na.rm=TRUE)) %>%
+  ggplot(aes(surveydate, mean, color=race_bl)) +
+  geom_point() +
+  geom_line() +
+  ylim(0,100)
+
+p
 
 ```
-# difference in baseline worry between blacks and whites (need to limit to ids since 10/17)
-```{r}
-#create binary race variable from baseline survey
-Baseline<-Baseline %>%
-  mutate(race_cat2=case_when(race_bl=="White" ~0,
-                              race_bl=="Black or African American"~1))%>%
-  filter(!is.na(worry_bl_1)) %>%
-  filter(!is.na(race_cat2))
 
-model<-lm(worry_bl_1 ~ race_cat2, Baseline)
-summary(model)
-
-
-install.packages("agricolae")
-library(agricolae)
-
-Median.test(Baseline$worry_bl_1, Baseline$race_cat2)
-```
-
-
-# interactions with think
-```{r}
-#case count category
-glmer_glmCC_think<- glmer(data= MSV4models, MoreProtect ~ CC_cat + think_AMED + think_AMED*CC_cat + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_think)
-
-#run worry model
-glmer_glmCC_thinkb<- glmer(data= MSV4models, MoreProtect ~ CC_cat + think_AMED + (1|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
-summary(glmer_glmCC_thinkb)
-
-lrtest(glmer_glmCC_think, glmer_glmCC_thinkb)
-```
 
 
 # Make figure plus table
