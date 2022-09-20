@@ -14,7 +14,7 @@ fun1<-function(group, var, name){
                               var %in% c("Yes") ~"Yes")) %>%
     group_by(group, surveydate, y) %>%
     drop_na(var) %>%
-    summarise(Percentage = sum(Percentage)) %>% #redifnes percentage based on two categoires with "unsure" grouped with no
+    summarise(Percentage = sum(Percentage)) %>% #redefines percentage based on two categories with "unsure" grouped with no
     mutate(Percentage=ifelse(y=="No" & Percentage=="100", 0, Percentage)) %>% #Sets percentage to 0 if the group level had no exposure or unsure exposure
     mutate(y=ifelse(y=="No" & Percentage==0,"Yes", y)) %>%  #If 0% of group reported no exposure, reset to Yes exposure so that % exposed can be 0%
     filter(y=="Yes") #this is the number for the dashboard.
@@ -182,23 +182,23 @@ fun6<-function(group, filt, var, name, exception=""){
 }
 
 fun7<-function (filt, var, name)
-  {
+{
   M_ind <<- Merged_survey %>%
     select(ExternalReference, {{filt}}, surveydate, {{var}}, gender_cat, race_cat, age_cat, partype) %>%
     rename(filt = 2) %>%
     rename(var = 4) %>%
     filter(!is.na(var)) %>%
     group_by(ExternalReference) %>%
-  filter(surveydate == min(surveydate)) %>%
-  mutate(FB_response = case_when(var %in% c("Definitely true", "Seems like it could be true") ~2,
-                                 var %in% c("Not sure if it's true or untrue") ~ 1,
-                                 var %in% c("Definitely not true", "Seems like it's not true") ~0)) %>%
-  mutate(Myth = name) %>%
-  rename(Reaction = var)
-M_ind$FB_response <- factor(M_ind$FB_response, levels = c(0:2), labels = c("no", "unsure", "yes"))
-M_ind <<- M_ind
-df2 <<- M_ind[-c(2)]
-first_believe <<- rbind(first_believe, df2)
+    filter(surveydate == min(surveydate)) %>%
+    mutate(FB_response = case_when(var %in% c("Definitely true", "Seems like it could be true") ~2,
+                                   var %in% c("Not sure if it's true or untrue") ~ 1,
+                                   var %in% c("Definitely not true", "Seems like it's not true") ~0)) %>%
+    mutate(Myth = name) %>%
+    rename(Reaction = var)
+  M_ind$FB_response <- factor(M_ind$FB_response, levels = c(0:2), labels = c("no", "unsure", "yes"))
+  M_ind <<- M_ind
+  df2 <<- M_ind[-c(2)]
+  first_believe <<- rbind(first_believe, df2)
 }
 
 
@@ -217,7 +217,7 @@ fun8<-function (filt, var, name)
     rename(filt = 2) %>%
     rename(var = 4) %>%
     filter(!is.na(var)) %>% mutate(first_flag = case_when(filt =="Yes" & surveydate == min(surveydate) ~ 1, filt != "Yes" ~
-                                                                                  0, filt == "Yes" & surveydate != min(surveydate) ~ 0)) %>%
+                                                            0, filt == "Yes" & surveydate != min(surveydate) ~ 0)) %>%
     mutate(Baseline_response = case_when(first_flag = 1 & var %in% c("Definitely true", "Seems like it could be true")~2,
                                          first_flag = 1 & var %in% c("Not sure if it's true or untrue") ~1,
                                          first_flag = 1 & var %in% c("Definitely not true", "Seems like it's not true") ~ 0)) %>%
@@ -228,7 +228,7 @@ fun8<-function (filt, var, name)
 
 # First believe functions 9 and 10
 fun9<-function (filt){
-M_react2 <- FB1 %>% filter(Exposure == "Yes", Myth == {{filt}})
+  M_react2 <- FB1 %>% filter(Exposure == "Yes", Myth == {{filt}})
   dates <- as.character(unique(M_react2$surveydate))
   for (i in dates) {
     M_react3 <- M_react2 %>%
