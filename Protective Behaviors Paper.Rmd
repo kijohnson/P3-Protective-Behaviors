@@ -161,7 +161,7 @@ CovidStat$CS_infection <- factor(CovidStat$CS_infection, levels=c(1:0), labels=c
 table(CovidStat$CS_infection)
 ```
 
-# Create file to get percentages of Self or close contact having covid infection in last week
+# Create file to get percentages of self or close contact having covid infection in last week
 ```{r}
 # CS_infected
 CovidStat2<-CovidStat %>%
@@ -169,7 +169,6 @@ CovidStat2<-CovidStat %>%
   summarise(Percentage=n()) %>% 
   mutate(Percentage=Percentage/sum(Percentage)*100) 
 ```
-
 
 # Create dataframe limiting to % more protective behaviors
 ```{r}
@@ -288,7 +287,6 @@ CovidStat3_limited1<-CovidStat3_limited %>%
   rename(STL_Cases=sum, Variable=CS_infection)  # infection last week
 
 # rbind together
-
 Data4Plot<-rbind(PF_limited1, CovidStat3_limited1)
 
 # covert to date formats
@@ -342,7 +340,6 @@ dev.off()
 ```
 
 
-
 # Dataset for logistic analyses that asks whether individuals report more protective behaviors than the week before when case counts are high or when they are sick or a close contact is sick
 ```{r}
 # creating the binary MoreProtect dependent and CloseContact independent variables
@@ -357,8 +354,8 @@ dates<-unique(dates)
 
 # get quantiles
 quantile(dates$sum, na.rm = TRUE) 
-#quantile(dates$total_covid_hospitalized) 
 
+#quantile(dates$total_covid_hospitalized) 
 MSV4models <- MSV4models%>% # make quartile categories for case counts
   mutate(CC_cat = if_else(sum< 1051, 0 ,
                           if_else(sum >=1051 & sum<2147, 1,
@@ -555,8 +552,6 @@ ctab8a <-rename(ctab8,"OR" = c("est"),
 print(ctab8a)
 ```
 
-
-
 # Close contact interactions gender (paragraph 5 results)
 ```{r}
 # gender
@@ -568,6 +563,7 @@ summary(glmer_glmCC_gen)
 
 lrtest(glmer_glmCC_gen1, glmer_glmCC_gen)
 ```
+
 # Close contact interactions age (paragraph 5 results)
 ```{r}
 glmer_glmCC_age1<- glmer(data= MSV4models_age, MoreProtect ~ CC_cat + CloseContact + as.factor(age_cat2)  + rank + (rank|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
@@ -578,6 +574,7 @@ summary(glmer_glmCC_age)
 
 lrtest(glmer_glmCC_age1, glmer_glmCC_age)
 ```
+
 # Close contact interactions race (paragraph 5 results)
 ```{r}
 glmer_glmCC_race1<- glmer(data= MSV4models_race, MoreProtect ~ CC_cat + CloseContact + race_bl2  + rank + (rank|ExternalReference), family = binomial, control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
@@ -692,6 +689,24 @@ pdf("Figure2.pdf", width=15, height=10, paper="USr", bg="white")
 p  + plot_layout(ncol=1, nrow=1, guides='keep') &
   theme(legend.position='bottom')
 dev.off()
+```
+# For revision (table showing how many people completed each week's survey)
+```{r}
+# of surveys completed by date
+survyno <- MSV4models %>%
+  group_by(surveydate) %>%
+  tally()
+
+# of surveys completed by individual
+
+survyno_ind <- MSV4models %>%
+  group_by(ExternalReference) %>%
+  tally()
+
+summary(survyno_ind$n)
+
+sheets<-list("Surveys completed by date" = survyno)
+write.xlsx(sheets, file="Supplementary_tables.xlsx", keepNA=TRUE, overwrite=TRUE)
 ```
 
 
